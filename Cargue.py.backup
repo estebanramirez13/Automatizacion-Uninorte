@@ -364,10 +364,26 @@ if st.button("🚀 Ejecutar función excel_exportar"):
                     
                     # Obtener filtros dinámicos (disponibles para TODAS las oficinas)
                     filtros_dinamicos = st.session_state.get("columnas_filtros_dinamicos", [])
-                    
-                    # Llamar excel_exportar para TODAS las oficinas con soporte de filtros
-                    with st.spinner("Generando archivo Excel..." + (" y slicers..." if filtros_dinamicos else "")):
-                        modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica, filtros_dinamicos)
+                    if filtros_dinamicos:
+                        st.info(f"Filtros dinamicos: {len(filtros_dinamicos)} columnas - {', '.join(filtros_dinamicos)}")
+                        if filtros_dinamicos:
+                            st.write(f"� Columnas: {', '.join(filtros_dinamicos)}")
+                        else:
+                            st.warning("⚠️ ADVERTENCIA: No hay columnas de filtro seleccionadas. Los slicers NO se crearán.")
+                        
+                        # Debug adicional
+                        import sys
+                        print(f"\n{'='*70}")
+                        print(f"DEBUG CARGUE.PY - Antes de llamar excel_exportar")
+                        print(f"filtros_dinamicos = {filtros_dinamicos}")
+                        print(f"Tipo: {type(filtros_dinamicos)}, Longitud: {len(filtros_dinamicos)}")
+                        print(f"{'='*70}\n")
+                        sys.stdout.flush()
+                        
+                        with st.spinner("Generando archivo Excel y agregando slicers..."):
+                            modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica, filtros_dinamicos)
+                    else:
+                        modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica)
                     st.session_state["ruta_archivo_generado"] = ruta_salida
                     st.success(f"✅ Función ejecutada y archivo generado como '{ruta_salida}'")
                 else:

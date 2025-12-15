@@ -23,7 +23,7 @@
         if tiene_filtros:
             return f'COUNTIFS(TB[{columna}],{criterio},TB[_VISIBLE],1)'
         else:
-            return f'{countif_visible({columna},{criterio})}'
+            return f'COUNTIF(TB[{columna}],{criterio})'
     Dijitacion = workbook.add_worksheet("Dijitación")
     n_poblacion =numerodepoblacion
     n_estimado=data.shape[0]
