@@ -11,6 +11,17 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
     import numpy as np
     import textwrap
     workbook = xlsxwriter.Workbook(f'{nombre_archivo}.xlsx')
+    
+    # Variable para determinar si hay filtros dinámicos
+    tiene_filtros = len(columnas_filtros_dinamicos) > 0
+    
+    # Función helper para generar fórmulas que consideran filas visibles
+    def countif_visible(columna, criterio):
+        """Genera COUNTIF que considera solo filas visibles cuando hay slicers"""
+        if tiene_filtros:
+            return f'COUNTIFS(TB[{columna}],{criterio},TB[_VISIBLE],1)'
+        else:
+            return f'COUNTIF(TB[{columna}],{criterio})'
     Dijitacion = workbook.add_worksheet("Digitación")
     n_poblacion =numerodepoblacion
     n_estimado=data.shape[0]
@@ -43,9 +54,29 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 Dijitacion.write(row_num+1, col_num, cell_data)
 
     n_rows, n_cols = data.shape
-    Dijitacion.add_table(0, 0, n_rows, n_cols - 1, 
-        {'columns': [{'header': col} for col in data.columns],
-        'name': 'TB'})  
+    
+    # Si hay filtros dinámicos, agregar columna auxiliar para detectar filas visibles
+    tiene_filtros = len(columnas_filtros_dinamicos) > 0
+    if tiene_filtros:
+        # Agregar columna auxiliar "_VISIBLE" que detecta si la fila está visible
+        Dijitacion.write(0, n_cols, "_VISIBLE")
+        for row in range(1, n_rows + 1):
+            # SUBTOTAL(103, rango) cuenta celdas visibles (no ocultas por filtros)
+            # Si devuelve 1, la fila está visible; si devuelve 0, está oculta
+            Dijitacion.write_formula(row, n_cols, f'=SUBTOTAL(103,A{row+1})')
+        
+        # Crear tabla incluyendo la columna auxiliar
+        Dijitacion.add_table(0, 0, n_rows, n_cols, 
+            {'columns': [{'header': col} for col in data.columns] + [{'header': '_VISIBLE'}],
+            'name': 'TB'})
+        
+        # Ocultar la columna auxiliar
+        Dijitacion.set_column(n_cols, n_cols, None, None, {'hidden': True})
+    else:
+        # Sin filtros, crear tabla normal
+        Dijitacion.add_table(0, 0, n_rows, n_cols - 1, 
+            {'columns': [{'header': col} for col in data.columns],
+            'name': 'TB'})  
 
     for col_num, col_name in enumerate(data.columns):
         # Medir el ancho del header
@@ -256,15 +287,15 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(6, col, f'=COUNTIF(TB[{general}],"No Aplica")/{n_estimado}', formato_borde_personalizado)
+            TG.write_formula(6, col, f'={countif_visible(general, "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
         else:
-            TG.write_formula(6, col,f'=COUNTIF(TB[{general}],{respuestas[col-17]})/({n_estimado}-COUNTIF(TB[{general}],"No Aplica"))', formato_borde_personalizado)
+            TG.write_formula(6, col,f'={countif_visible(general, respuestas[col-17])}/({n_estimado}-{countif_visible(general, "\"No Aplica\"")})', formato_borde_personalizado)
 
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(7, col, f'=COUNTIF(TB[{general}],"No Aplica")', formato_borde_personalizado1)
+            TG.write_formula(7, col, f'={countif_visible(general, "\"No Aplica\"")}', formato_borde_personalizado1)
         else:
-            TG.write_formula(7, col,f'=COUNTIF(TB[{general}],{respuestas[col-17]})', formato_borde_personalizado1)
+            TG.write_formula(7, col,f'={countif_visible(general, respuestas[col-17])}', formato_borde_personalizado1)
 
     #Grafica geeneral
     # Crea un gráfico de tipo columna en el bloque de la izquierda
@@ -384,9 +415,9 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
         for col in range(5, 11):
             if col==10:
-                worksheet.write_formula(start_row + 3, col, f'=COUNTIF(TB[{Preguntas[2*k]}],"No Aplica")/{n_estimado}', formato_borde_personalizado)
+                worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k], "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
             else:
-                worksheet.write_formula(start_row + 3, col,f'=COUNTIF(TB[{Preguntas[2*k]}],{respuestas[col-5]})/({n_estimado}-COUNTIF(TB[{Preguntas[2*k]}],"No Aplica"))', formato_borde_personalizado)
+                worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k], respuestas[col-5])}/({n_estimado}-{countif_visible(Preguntas[2*k], "\"No Aplica\"")})', formato_borde_personalizado)
         
         inicio_nsp=xl_rowcol_to_cell(start_row+3, 5)
         fin_nsp=xl_rowcol_to_cell(start_row+3, 10)
@@ -441,9 +472,9 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
             # Aplicar bordes a la fila siguiente en el mismo rango de columnas
             for col in range(17, 23):
                 if col==22:
-                    worksheet.write_formula(start_row + 3, col, f'=COUNTIF(TB[{Preguntas[2*k+1]}],"No Aplica")/{n_estimado}', formato_borde_personalizado)
+                    worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k+1], "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
                 else:
-                    worksheet.write_formula(start_row + 3, col,f'=COUNTIF(TB[{Preguntas[2*k+1]}],{respuestas[col-17]})/({n_estimado}-COUNTIF(TB[{Preguntas[2*k+1]}],"No Aplica"))', formato_borde_personalizado)
+                    worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k+1], respuestas[col-17])}/({n_estimado}-{countif_visible(Preguntas[2*k+1], "\"No Aplica\"")})', formato_borde_personalizado)
             
             for col in range(17, 23):
                 worksheet.merge_range(start_row + 1, col, start_row + 2, col, labels_graph[col-17], formato_combinado3)
@@ -1215,51 +1246,14 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 excel.Quit()
                 return
             
-            # Crear cache de tabla dinámica basado en la tabla TB
-            print("\n📊 Creando tabla dinámica oculta...")
+            # ENFOQUE CORRECTO: Conectar slicers directamente a la tabla TB
+            # Los slicers de tabla (no de tabla dinámica) filtran la tabla y todo lo conectado a ella
+            print("\n📊 Preparando slicers para tabla TB...")
             sys.stdout.flush()
             
-            # Obtener el rango de la tabla
-            tabla_range = tabla_tb.Range
-            
-            # Crear la tabla dinámica en la hoja T+G (se ocultará después)
-            # Posición donde se creará la tabla dinámica (fuera de vista)
-            destino_pivote = ws_tg.Range("Z1")
-            
-            # Crear cache de tabla dinámica
-            pivot_cache = wb.PivotCaches().Create(
-                SourceType=1,  # xlDatabase
-                SourceData=tabla_range
-            )
-            
-            # Crear la tabla dinámica
-            pivot_table = pivot_cache.CreatePivotTable(
-                TableDestination=destino_pivote,
-                TableName="PivotTable_Slicers"
-            )
-            
-            print("✅ Tabla dinámica creada")
-            sys.stdout.flush()
-            
-            # Agregar TODOS los campos de filtro a la tabla dinámica primero (necesario para slicers)
-            # Los agregamos como campos de página (filtros) para que no se muestren en la tabla
-            if columnas_filtros_dinamicos:
-                print(f"\n📋 Agregando {len(columnas_filtros_dinamicos)} campos a la tabla dinámica...")
-                sys.stdout.flush()
-                for campo in columnas_filtros_dinamicos:
-                    if campo in data.columns.tolist():
-                        try:
-                            # Agregar como campo de página (filtro) - orientación 3 = xlPageField
-                            pivot_table.PivotFields(campo).Orientation = 3
-                            print(f"   ✅ Campo agregado: {campo}")
-                            sys.stdout.flush()
-                        except Exception as e:
-                            print(f"   ⚠️ No se pudo agregar campo '{campo}': {e}")
-                            sys.stdout.flush()
-            
-            # Crear slicers conectados a la tabla dinámica
+            # Crear slicers conectados directamente a la tabla TB
             slicers_agregados = []
-            print(f"\n🎨 Creando {len(columnas_filtros_dinamicos)} slicer(s)...")
+            print(f"\n🎨 Creando {len(columnas_filtros_dinamicos)} slicer(s) conectados a tabla TB...")
             sys.stdout.flush()
             
             for idx, col_filtro in enumerate(columnas_filtros_dinamicos):
@@ -1267,14 +1261,11 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 sys.stdout.flush()
                 if col_filtro in data.columns.tolist():
                     try:
-                        # Obtener el PivotField que agregamos anteriormente
-                        pivot_field = pivot_table.PivotFields(col_filtro)
-                        
-                        # Crear slicer conectado usando el método Add (más simple que Add2)
-                        # Parámetros: Source, SourceField
+                        # Crear slicer conectado directamente a la tabla TB
+                        # Esto hace que el slicer filtre la tabla, y por ende los cálculos en T+G
                         slicer_cache = wb.SlicerCaches.Add(
-                            Source=pivot_table,
-                            SourceField=pivot_field
+                            Source=tabla_tb,
+                            SourceField=col_filtro
                         )
                         
                         slicer = slicer_cache.Slicers.Add(
@@ -1288,7 +1279,7 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                         slicer.Width = 250
                         
                         slicers_agregados.append(col_filtro)
-                        print(f"   ✅ Slicer creado exitosamente")
+                        print(f"   ✅ Slicer creado y conectado a tabla TB")
                         sys.stdout.flush()
                     except Exception as e:
                         print(f"   ❌ Error: {e}")
@@ -1298,11 +1289,6 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 else:
                     print(f"   ⚠️ Columna '{col_filtro}' no encontrada en el DataFrame")
                     sys.stdout.flush()
-            
-            # Ocultar la columna Z donde está la tabla dinámica
-            ws_tg.Columns("Z:AA").Hidden = True
-            print("✅ Tabla dinámica ocultada")
-            sys.stdout.flush()
             
             # Guardar y cerrar
             print(f"\n💾 Guardando archivo...")
