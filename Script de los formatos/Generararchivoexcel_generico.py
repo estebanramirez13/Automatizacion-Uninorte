@@ -101,6 +101,9 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
     for col_num, header in enumerate(data.columns):
         Dijitacion.write(0, col_num, header, header_format)
 
+    # No agregar AutoFilter aquí porque ya está incluido en la tabla add_table()
+    # La tabla 'TB' ya tiene filtros automáticos integrados
+
     #Función para calcular la poblacion estimada
     def calcular_poblacion_estimada(N):
         n=math.ceil((384.16)/(1+((384.16-1)/N)))
@@ -1144,3 +1147,198 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 'name':    f'Tabla_{i}'
             })
     workbook.close()
+    
+    # Agregar slicers usando win32com si hay columnas de filtro seleccionadas
+    import sys
+    sys.stdout.flush()
+    
+    print(f"\n{'='*60}")
+    print(f"DEBUG: columnas_filtros_dinamicos = {columnas_filtros_dinamicos}")
+    print(f"DEBUG: Tipo = {type(columnas_filtros_dinamicos)}, Cantidad = {len(columnas_filtros_dinamicos) if columnas_filtros_dinamicos else 0}")
+    print(f"{'='*60}\n")
+    sys.stdout.flush()
+    
+    if columnas_filtros_dinamicos and len(columnas_filtros_dinamicos) > 0:
+        print("🔄 Iniciando proceso de creación de slicers con tabla dinámica...")
+        sys.stdout.flush()
+        try:
+            import win32com.client
+            from win32com.client import constants as c
+            import pythoncom
+            import os
+            
+            # CRÍTICO: Inicializar COM para este thread
+            pythoncom.CoInitialize()
+            print("✅ COM inicializado correctamente")
+            sys.stdout.flush()
+            
+            # Obtener ruta absoluta del archivo
+            archivo_path = os.path.abspath(f'{nombre_archivo}.xlsx')
+            print(f"📁 Ruta del archivo: {archivo_path}")
+            sys.stdout.flush()
+            
+            # Abrir Excel - VISIBLE para debugging
+            excel = win32com.client.Dispatch("Excel.Application")
+            excel.Visible = True  # VISIBLE para ver qué pasa
+            excel.DisplayAlerts = False
+            print("✅ Excel abierto VISIBLE")
+            sys.stdout.flush()
+            
+            # Abrir el workbook
+            wb = excel.Workbooks.Open(archivo_path)
+            print("✅ Workbook abierto")
+            sys.stdout.flush()
+            
+            # Obtener las hojas
+            ws_digitacion = wb.Worksheets("Digitación")
+            ws_tg = wb.Worksheets("T+G")
+            print("✅ Hojas obtenidas (Digitación y T+G)")
+            sys.stdout.flush()
+            
+            # Obtener el objeto de la tabla "TB" en Digitación
+            tabla_tb = None
+            print(f"🔍 Buscando tabla TB... (Total tablas: {ws_digitacion.ListObjects.Count})")
+            sys.stdout.flush()
+            for tbl in ws_digitacion.ListObjects:
+                print(f"   - Tabla encontrada: {tbl.Name}")
+                sys.stdout.flush()
+                if tbl.Name == "TB":
+                    tabla_tb = tbl
+                    print("✅ ¡Tabla TB encontrada!")
+                    sys.stdout.flush()
+                    break
+            
+            if not tabla_tb:
+                print("❌ ERROR: No se encontró la tabla TB")
+                sys.stdout.flush()
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                return
+            
+            # Crear cache de tabla dinámica basado en la tabla TB
+            print("\n📊 Creando tabla dinámica oculta...")
+            sys.stdout.flush()
+            
+            # Obtener el rango de la tabla
+            tabla_range = tabla_tb.Range
+            
+            # Crear la tabla dinámica en la hoja T+G (se ocultará después)
+            # Posición donde se creará la tabla dinámica (fuera de vista)
+            destino_pivote = ws_tg.Range("Z1")
+            
+            # Crear cache de tabla dinámica
+            pivot_cache = wb.PivotCaches().Create(
+                SourceType=1,  # xlDatabase
+                SourceData=tabla_range
+            )
+            
+            # Crear la tabla dinámica
+            pivot_table = pivot_cache.CreatePivotTable(
+                TableDestination=destino_pivote,
+                TableName="PivotTable_Slicers"
+            )
+            
+            print("✅ Tabla dinámica creada")
+            sys.stdout.flush()
+            
+            # Agregar TODOS los campos de filtro a la tabla dinámica primero (necesario para slicers)
+            # Los agregamos como campos de página (filtros) para que no se muestren en la tabla
+            if columnas_filtros_dinamicos:
+                print(f"\n📋 Agregando {len(columnas_filtros_dinamicos)} campos a la tabla dinámica...")
+                sys.stdout.flush()
+                for campo in columnas_filtros_dinamicos:
+                    if campo in data.columns.tolist():
+                        try:
+                            # Agregar como campo de página (filtro) - orientación 3 = xlPageField
+                            pivot_table.PivotFields(campo).Orientation = 3
+                            print(f"   ✅ Campo agregado: {campo}")
+                            sys.stdout.flush()
+                        except Exception as e:
+                            print(f"   ⚠️ No se pudo agregar campo '{campo}': {e}")
+                            sys.stdout.flush()
+            
+            # Crear slicers conectados a la tabla dinámica
+            slicers_agregados = []
+            print(f"\n🎨 Creando {len(columnas_filtros_dinamicos)} slicer(s)...")
+            sys.stdout.flush()
+            
+            for idx, col_filtro in enumerate(columnas_filtros_dinamicos):
+                print(f"\n   [{idx+1}/{len(columnas_filtros_dinamicos)}] Procesando: {col_filtro}")
+                sys.stdout.flush()
+                if col_filtro in data.columns.tolist():
+                    try:
+                        # Obtener el PivotField que agregamos anteriormente
+                        pivot_field = pivot_table.PivotFields(col_filtro)
+                        
+                        # Crear slicer conectado usando el método Add (más simple que Add2)
+                        # Parámetros: Source, SourceField
+                        slicer_cache = wb.SlicerCaches.Add(
+                            Source=pivot_table,
+                            SourceField=pivot_field
+                        )
+                        
+                        slicer = slicer_cache.Slicers.Add(
+                            SlicerDestination=ws_tg
+                        )
+                        
+                        # Posicionar el slicer
+                        slicer.Top = 50 + (idx * 220)
+                        slicer.Left = 50
+                        slicer.Height = 200
+                        slicer.Width = 250
+                        
+                        slicers_agregados.append(col_filtro)
+                        print(f"   ✅ Slicer creado exitosamente")
+                        sys.stdout.flush()
+                    except Exception as e:
+                        print(f"   ❌ Error: {e}")
+                        sys.stdout.flush()
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"   ⚠️ Columna '{col_filtro}' no encontrada en el DataFrame")
+                    sys.stdout.flush()
+            
+            # Ocultar la columna Z donde está la tabla dinámica
+            ws_tg.Columns("Z:AA").Hidden = True
+            print("✅ Tabla dinámica ocultada")
+            sys.stdout.flush()
+            
+            # Guardar y cerrar
+            print(f"\n💾 Guardando archivo...")
+            sys.stdout.flush()
+            wb.Save()
+            wb.Close(SaveChanges=True)
+            excel.Quit()
+            
+            # Limpiar COM
+            pythoncom.CoUninitialize()
+            print("✅ COM finalizado correctamente")
+            sys.stdout.flush()
+            
+            print(f"\n{'='*60}")
+            print(f"✅ PROCESO COMPLETADO")
+            print(f"   Slicers agregados: {', '.join(slicers_agregados) if slicers_agregados else 'ninguno'}")
+            print(f"{'='*60}\n")
+            sys.stdout.flush()
+            
+        except ImportError as ie:
+            print(f"❌ pywin32 no está instalado: {ie}")
+            sys.stdout.flush()
+            try:
+                pythoncom.CoUninitialize()
+            except:
+                pass
+        except Exception as e:
+            print(f"❌ Error al agregar slicers: {e}")
+            sys.stdout.flush()
+            import traceback
+            traceback.print_exc()
+            sys.stdout.flush()
+            try:
+                pythoncom.CoUninitialize()
+            except:
+                pass
+    else:
+        print("ℹ️ No hay columnas de filtro seleccionadas, saltando creación de slicers")
+        sys.stdout.flush()

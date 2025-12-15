@@ -10,7 +10,7 @@ def procesar_excel(df):
     # Procesamiento tipo Procesar.ipynb: limpieza, renombrado, reemplazo de valores
     nuevos_encabezados = [str(columna).split('-')[-1].strip() if '-' in str(columna) else str(columna) for columna in df.columns]
     df.columns = nuevos_encabezados
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
     reemplazos = {
         "5 (Supera las expectativas)":5, "5 - Muy satisfecho":5, "Muy satisfecho":5, "5. Supera notablemente las expectativas":5,
         "Supera notablemente las expectativas":5, "5 - Supera notablemente las expectativas":5, "5-Supera notablemente las expectativas":5,
@@ -216,13 +216,6 @@ if archivo_excel is not None:
         st.error(f"❌ Error al leer o procesar el archivo: {e}")
 elif "df_encuesta" in st.session_state:
     df = st.session_state["df_encuesta"]
-# Variables para almacenar selecciones
-df = pd.DataFrame()
-columnas_seleccionadas = []
-columnas_pregunta_detectadas = []
-columnas_observaciones_detectadas = []
-nombre_columna_general = ""
-ruta_archivo_generado = None
 
 # --- Sección: Configuración ---
 st.markdown('<div class="section-title">2️⃣ Seleccionar oficina y parámetros</div>', unsafe_allow_html=True)
@@ -253,6 +246,11 @@ periodo_unico  = st.text_input("📝 Escribir periodo en que se relizo la encues
 if archivo_excel is not None:
     df = pd.read_excel(archivo_excel)
     st.success("✅ Archivo cargado exitosamente")
+    
+    # Inicializar variables que se usan en este bloque
+    columnas_pregunta_detectadas = []
+    columnas_observaciones_detectadas = []
+    nombre_columna_general = ""
     #st.dataframe(df.head(), use_container_width=True)
 
     #Oficina con filtros
@@ -263,22 +261,14 @@ if archivo_excel is not None:
         st.markdown('<div class="section-title">🔍 Filtros específicos para prueba</div>', unsafe_allow_html=True)
 
         if archivo_excel is not None and not df.empty:
-            columnas_filtrar = st.sidebar.multiselect("Selecciona las columnas para aplicar filtros:", options=df.columns.tolist())
 
-            for columna in columnas_filtrar:
-                valores_unicos = df[columna].dropna().unique().tolist()
-                valores_seleccionados = st.sidebar.multiselect(f"Selecciona los valores para '{columna}':", options=valores_unicos)
-
-                if valores_seleccionados:
-                    df = df[df[columna].isin(valores_seleccionados)].reset_index(drop=True)
-
-            st.sidebar.success(f"✅ Registros filtrados: {len(df)}")
-            st.dataframe(df, use_container_width=True)
+            # Filtros eliminados de la barra lateral, solo se muestra la tabla filtrada si aplica
+            st.dataframe(df, width='stretch')
 
         else:
             st.sidebar.warning("⚠️ Sube un archivo Excel para aplicar los filtros.")
     else:   
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width='stretch')
     columnas_todo_no_aplica = [col for col in df.columns if (df[col] == "No Aplica").all()]
     # --- Detectar columnas de preguntas automáticamente ---
     posibles_valores = {"1", "2", "3", "4", "5", "No Aplica"}
@@ -313,26 +303,28 @@ if archivo_excel is not None:
     st.session_state["proceso_seleccionado"]=proceso_seleccionado
     st.session_state["df_encuesta"] = df
     st.session_state["columnas_seleccionadas"] = columnas_seleccionadas
+    st.session_state["columnas_observaciones"] = columnas_observaciones
     st.session_state["nombre_columna_general"] = nombre_columna_general
 
-#---Sección de seleccionar columnas para filtros dinámicos (slicers)---------------------------
-st.markdown('<div class="section-title">🎛️ Seleccionar columnas para filtros dinámicos (opcional)</div>', unsafe_allow_html=True)
-st.info("Los filtros dinámicos permiten segmentar los datos en la hoja T+G (ej: por programa, sede, tipo de estudiante, etc.)")
-columnas_filtros_dinamicos = st.multiselect("📊 Selecciona columnas para crear filtros desplegables en T+G:", options=df.columns.tolist())
+    #---Sección de seleccionar columnas para filtros dinámicos (slicers)---------------------------
+    st.markdown('<div class="section-title">🎛️ Seleccionar columnas para filtros dinámicos (opcional)</div>', unsafe_allow_html=True)
+    st.info("Los filtros dinámicos permiten segmentar los datos en la hoja T+G (ej: por programa, sede, tipo de estudiante, etc.)")
+    columnas_filtros_dinamicos = st.multiselect("📊 Selecciona columnas para crear filtros desplegables en T+G:", options=df.columns.tolist())
+    st.session_state["columnas_filtros_dinamicos"] = columnas_filtros_dinamicos
 
-#---Sección de selcionar graficas---------------------------
-st.markdown('<div class="section-title">📊 Seleccionar gráficas (opcional)</div>', unsafe_allow_html=True)
-seleccionadas = st.multiselect("Selecciona las métricas que deseas visualizar:", options=df.columns.tolist())
-# Paso 2: Para cada opción seleccionada, elegir entre 'bar' o 'column'
-tipos_grafica = {}
+    #---Sección de selcionar graficas---------------------------
+    st.markdown('<div class="section-title">📊 Seleccionar gráficas (opcional)</div>', unsafe_allow_html=True)
+    seleccionadas = st.multiselect("Selecciona las métricas que deseas visualizar:", options=df.columns.tolist())
+    # Paso 2: Para cada opción seleccionada, elegir entre 'bar' o 'column'
+    tipos_grafica = {}
 
-for item in seleccionadas:
-    tipo = st.selectbox(
-        f"Selecciona el tipo de gráfica para '{item}':",
-        ['pie', 'column'],
-        key=item  # Importante: usar key único para evitar conflictos en el renderizado
-    )
-    tipos_grafica[item] = tipo
+    for item in seleccionadas:
+        tipo = st.selectbox(
+            f"Selecciona el tipo de gráfica para '{item}':",
+            ['pie', 'column'],
+            key=item  # Importante: usar key único para evitar conflictos en el renderizado
+        )
+        tipos_grafica[item] = tipo
     # --- Sección: Ejecutar proceso ---
 st.markdown('<div class="section-title">3️⃣ Ejecutar proceso</div>', unsafe_allow_html=True)
 if st.button("🚀 Ejecutar función excel_exportar"):
@@ -340,9 +332,11 @@ if st.button("🚀 Ejecutar función excel_exportar"):
         st.warning("⚠️ Por favor sube el archivo Excel.")
     else:
         try:
-            preguntas = columnas_seleccionadas
-            comentarios = columnas_observaciones
-            general = nombre_columna_general
+            # Obtener datos del session_state
+            df = st.session_state.get("df_encuesta", pd.DataFrame())
+            preguntas = st.session_state.get("columnas_seleccionadas", [])
+            comentarios = st.session_state.get("columnas_observaciones", [])
+            general = st.session_state.get("nombre_columna_general", "")
             oficina = oficina_seleccionada
             proceso = proceso_seleccionado
             script_name = diccionario_oficinas[oficina]["script"]
@@ -368,25 +362,44 @@ if st.button("🚀 Ejecutar función excel_exportar"):
                             otras = [c for c in df.columns if c != col_primera]
                             df = df[[col_primera] + otras]
                     if script_name == "Generararchivoexcel_generico":
-                        modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica, columnas_filtros_dinamicos)
+                        filtros_dinamicos = st.session_state.get("columnas_filtros_dinamicos", [])
+                        st.info(f"🔍 Filtros dinámicos seleccionados: {len(filtros_dinamicos)} columnas")
+                        if filtros_dinamicos:
+                            st.write(f"📋 Columnas: {', '.join(filtros_dinamicos)}")
+                        else:
+                            st.warning("⚠️ ADVERTENCIA: No hay columnas de filtro seleccionadas. Los slicers NO se crearán.")
+                        
+                        # Debug adicional
+                        import sys
+                        print(f"\n{'='*70}")
+                        print(f"DEBUG CARGUE.PY - Antes de llamar excel_exportar")
+                        print(f"filtros_dinamicos = {filtros_dinamicos}")
+                        print(f"Tipo: {type(filtros_dinamicos)}, Longitud: {len(filtros_dinamicos)}")
+                        print(f"{'='*70}\n")
+                        sys.stdout.flush()
+                        
+                        with st.spinner("Generando archivo Excel y agregando slicers..."):
+                            modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica, filtros_dinamicos)
                     else:
                         modulo.excel_exportar(df, nombre_archivo, numerodepoblacion, preguntas, comentarios, general, oficina, proceso, periodo_unico, tipos_grafica)
-                    ruta_archivo_generado = ruta_salida
-                    st.success(f"✅ Función ejecutada y archivo generado como '{ruta_archivo_generado}'")
+                    st.session_state["ruta_archivo_generado"] = ruta_salida
+                    st.success(f"✅ Función ejecutada y archivo generado como '{ruta_salida}'")
                 else:
                     st.error("❌ El script no contiene una función llamada 'excel_exportar'.")
         except Exception as e:
             st.error(f"🚨 Error al ejecutar: {e}")
 
 # --- Botón de descarga si se ha generado el archivo ---
-if ruta_archivo_generado and os.path.exists(ruta_archivo_generado):
-    with open(ruta_archivo_generado, "rb") as f:
-        st.download_button(
-            label="📥 Descargar archivo generado",
-            data=f,
-            file_name=os.path.basename(ruta_archivo_generado),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+if "ruta_archivo_generado" in st.session_state:
+    ruta_archivo_generado = st.session_state["ruta_archivo_generado"]
+    if os.path.exists(ruta_archivo_generado):
+        with open(ruta_archivo_generado, "rb") as f:
+            st.download_button(
+                label="📥 Descargar archivo generado",
+                data=f,
+                file_name=os.path.basename(ruta_archivo_generado),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 # --- Pie de página ---
 st.markdown('<div class="footer">Desarrollado con ❤️ usando Streamlit · Universidad del Norte · 2025</div>', unsafe_allow_html=True)
