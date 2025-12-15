@@ -287,9 +287,13 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(6, col, f'={countif_visible(general, "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
+            # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
+            denominador = '$G$11' if tiene_filtros else str(n_estimado)
+            TG.write_formula(6, col, f'={countif_visible(general, "\"No Aplica\"")}/{denominador}', formato_borde_personalizado)
         else:
-            TG.write_formula(6, col,f'={countif_visible(general, respuestas[col-17])}/({n_estimado}-{countif_visible(general, "\"No Aplica\"")})', formato_borde_personalizado)
+            # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
+            denominador = '$G$11' if tiene_filtros else str(n_estimado)
+            TG.write_formula(6, col,f'={countif_visible(general, respuestas[col-17])}/({denominador}-{countif_visible(general, "\"No Aplica\"")})', formato_borde_personalizado)
 
     for col in range(17, 23):
         if col==22:
@@ -415,9 +419,11 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
         for col in range(5, 11):
             if col==10:
-                worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k], "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
+                denominador = '$G$11' if tiene_filtros else str(n_estimado)
+                worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k], "\"No Aplica\"")}/{denominador}', formato_borde_personalizado)
             else:
-                worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k], respuestas[col-5])}/({n_estimado}-{countif_visible(Preguntas[2*k], "\"No Aplica\"")})', formato_borde_personalizado)
+                denominador = '$G$11' if tiene_filtros else str(n_estimado)
+                worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k], respuestas[col-5])}/({denominador}-{countif_visible(Preguntas[2*k], "\"No Aplica\"")})', formato_borde_personalizado)
         
         inicio_nsp=xl_rowcol_to_cell(start_row+3, 5)
         fin_nsp=xl_rowcol_to_cell(start_row+3, 10)
@@ -472,9 +478,11 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
             # Aplicar bordes a la fila siguiente en el mismo rango de columnas
             for col in range(17, 23):
                 if col==22:
-                    worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k+1], "\"No Aplica\"")}/{n_estimado}', formato_borde_personalizado)
+                    denominador = '$G$11' if tiene_filtros else str(n_estimado)
+                    worksheet.write_formula(start_row + 3, col, f'={countif_visible(Preguntas[2*k+1], "\"No Aplica\"")}/{denominador}', formato_borde_personalizado)
                 else:
-                    worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k+1], respuestas[col-17])}/({n_estimado}-{countif_visible(Preguntas[2*k+1], "\"No Aplica\"")})', formato_borde_personalizado)
+                    denominador = '$G$11' if tiene_filtros else str(n_estimado)
+                    worksheet.write_formula(start_row + 3, col,f'={countif_visible(Preguntas[2*k+1], respuestas[col-17])}/({denominador}-{countif_visible(Preguntas[2*k+1], "\"No Aplica\"")})', formato_borde_personalizado)
             
             for col in range(17, 23):
                 worksheet.merge_range(start_row + 1, col, start_row + 2, col, labels_graph[col-17], formato_combinado3)
@@ -578,13 +586,18 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
             TG.merge_range(row, 6, row, 7, formula_varianza, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0.0%'}))
         elif row==10:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
-            TG.merge_range(row, 6, row, 7, data.shape[0], workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            # Muestra alcanzada: contar solo filas visibles si hay filtros
+            if tiene_filtros:
+                TG.merge_range(row, 6, row, 7, f'=SUMPRODUCT(TB[_VISIBLE])', workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            else:
+                TG.merge_range(row, 6, row, 7, data.shape[0], workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         elif row==9:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
             TG.merge_range(row, 6, row, 7, calcular_poblacion_estimada(n_poblacion), workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         elif row==8:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
-            TG.merge_range(row, 6, row, 7, n_poblacion, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            # Población: número ingresado por el usuario menos la suma de "No Aplica" (R8:V8)
+            TG.merge_range(row, 6, row, 7, f'={n_poblacion}-SUM(R8:V8)', workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         else:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
             TG.merge_range(row, 6, row, 7, None, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))

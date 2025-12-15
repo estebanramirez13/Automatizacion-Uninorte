@@ -365,7 +365,7 @@ if st.button("🚀 Ejecutar función excel_exportar"):
                         filtros_dinamicos = st.session_state.get("columnas_filtros_dinamicos", [])
                         st.info(f"🔍 Filtros dinámicos seleccionados: {len(filtros_dinamicos)} columnas")
                         if filtros_dinamicos:
-                            st.write(f"📋 Columnas: {', '.join(filtros_dinamicos)}")
+                            st.write(f"� Columnas: {', '.join(filtros_dinamicos)}")
                         else:
                             st.warning("⚠️ ADVERTENCIA: No hay columnas de filtro seleccionadas. Los slicers NO se crearán.")
                         

@@ -1,7 +1,8 @@
-def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_observaciones,general,oficina,proceso, perido,tipos_grafica):
+﻿def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_observaciones,general,oficina,proceso, perido,tipos_grafica, columnas_filtros_dinamicos=[]):
     #Hoja de Dijitación
     import xlsxwriter
     import pandas as pd
+    import sys
     import math
     from xlsxwriter.utility import xl_rowcol_to_cell
     from xlsxwriter.utility import xl_cell_to_rowcol
@@ -12,6 +13,17 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
     import textwrap
 
     workbook = xlsxwriter.Workbook(f'{nombre_archivo}.xlsx')
+
+    # Variable para determinar si hay filtros dinámicos
+    tiene_filtros = len(columnas_filtros_dinamicos) > 0
+    
+    # Función helper para generar fórmulas que consideran filas visibles
+    def countif_visible(columna, criterio):
+        """Genera COUNTIF que considera solo filas visibles cuando hay slicers"""
+        if tiene_filtros:
+            return f'COUNTIFS(TB[{columna}],{criterio},TB[_VISIBLE],1)'
+        else:
+            return f'{countif_visible({columna},{criterio})}'
     Dijitacion = workbook.add_worksheet("Digitación")
     n_poblacion =numerodepoblacion
     n_estimado=data.shape[0]
@@ -48,7 +60,34 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         {'columns': [{'header': col} for col in data.columns],
         'name': 'TB'})  
 
-    for col_num, col_name in enumerate(data.columns):
+    
+    # Si hay filtros, agregar columna auxiliar _VISIBLE
+    if tiene_filtros:
+        # Agregar columna _VISIBLE a los datos
+        data['_VISIBLE'] = 1
+        
+        # Encontrar el índice de la columna _VISIBLE
+        visible_col_idx = data.columns.get_loc('_VISIBLE')
+        
+        # Escribir la cabecera de _VISIBLE
+        Dijitacion.write(0, visible_col_idx, '_VISIBLE')
+        
+        # Escribir fórmulas SUBTOTAL para cada fila de datos
+        for row_num in range(len(data)):
+            # SUBTOTAL(103, rango) cuenta solo celdas visibles
+            # Usamos la columna A como referencia
+            formula = f'=SUBTOTAL(103,A{row_num+2})'
+            Dijitacion.write(row_num+1, visible_col_idx, formula)
+        
+        # Actualizar la tabla para incluir la nueva columna
+        n_rows, n_cols = data.shape
+        Dijitacion.add_table(0, 0, n_rows, n_cols - 1, 
+            {'columns': [{'header': col} for col in data.columns],
+            'name': 'TB'})
+        
+        # Ocultar la columna _VISIBLE
+        Dijitacion.set_column(visible_col_idx, visible_col_idx, None, None, {'hidden': True})
+for col_num, col_name in enumerate(data.columns):
         # Medir el ancho del header
         max_width = len(col_name)
 
@@ -250,15 +289,17 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(6, col, f'=COUNTIF(TB[{general}],"No Aplica")/{n_estimado}', formato_borde_personalizado)
+            # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
+            denominador = '$G$11' if tiene_filtros else str(n_estimado)
+            TG.write_formula(6, col, f'={countif_visible({general},"No Aplica")}/{denominador}', formato_borde_personalizado)
         else:
-            TG.write_formula(6, col,f'=COUNTIF(TB[{general}],{respuestas[col-17]})/({n_estimado}-COUNTIF(TB[{general}],"No Aplica"))', formato_borde_personalizado)
+            TG.write_formula(6, col,f'={countif_visible({general},{respuestas[col-17]})}/({denominador}-{countif_visible({general},"No Aplica")})', formato_borde_personalizado)
 
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(7, col, f'=COUNTIF(TB[{general}],"No Aplica")', formato_borde_personalizado1)
+            TG.write_formula(7, col, f'={countif_visible({general},"No Aplica")}', formato_borde_personalizado1)
         else:
-            TG.write_formula(7, col,f'=COUNTIF(TB[{general}],{respuestas[col-17]})', formato_borde_personalizado1)
+            TG.write_formula(7, col,f'={countif_visible({general},{respuestas[col-17]})}', formato_borde_personalizado1)
 
     #Grafica geeneral
     # Crea un gráfico de tipo columna en el bloque de la izquierda
@@ -541,13 +582,13 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
             TG.merge_range(row, 6, row, 7, formula_varianza, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0%'}))
         elif row==10:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
-            TG.merge_range(row, 6, row, 7, data.shape[0], workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            TG.merge_range(row, 6, row, 7, '=SUMPRODUCT(TB[_VISIBLE])' if tiene_filtros else data.shape[0], workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         elif row==9:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
             TG.merge_range(row, 6, row, 7, calcular_poblacion_estimada(n_poblacion), workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         elif row==8:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
-            TG.merge_range(row, 6, row, 7, n_poblacion, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            TG.merge_range(row, 6, row, 7, '=G9' if tiene_filtros else n_poblacion, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         else:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
             TG.merge_range(row, 6, row, 7, None, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
@@ -1139,4 +1180,153 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
                 'columns': [{'header': elemen}],
                 'name':    f'Tabla_{i}'
             })
+    
+    # ==============================================================
+    # CREACIÓN DE SLICERS DINÁMICOS (si se solicitaron filtros)
+    # ==============================================================
+    print(f"DEBUG: columnas_filtros_dinamicos = {columnas_filtros_dinamicos}")
+    print(f"DEBUG: Tipo = {type(columnas_filtros_dinamicos)}, Cantidad = {len(columnas_filtros_dinamicos) if columnas_filtros_dinamicos else 0}")
+    print(f"{'='*60}\n")
+    sys.stdout.flush()
+    
+    if columnas_filtros_dinamicos and len(columnas_filtros_dinamicos) > 0:
+        print("🔄 Iniciando proceso de creación de slicers con tabla dinámica...")
+        sys.stdout.flush()
+        try:
+            import win32com.client
+            from win32com.client import constants as c
+            import pythoncom
+            import os
+            
+            # CRÍTICO: Inicializar COM para este thread
+            pythoncom.CoInitialize()
+            print("✅ COM inicializado correctamente")
+            sys.stdout.flush()
+            
+            # Obtener ruta absoluta del archivo
+            archivo_path = os.path.abspath(f'{nombre_archivo}.xlsx')
+            print(f"📁 Ruta del archivo: {archivo_path}")
+            sys.stdout.flush()
+            
+            # Abrir Excel - VISIBLE para debugging
+            excel = win32com.client.Dispatch("Excel.Application")
+            excel.Visible = True  # VISIBLE para ver qué pasa
+            excel.DisplayAlerts = False
+            print("✅ Excel abierto VISIBLE")
+            sys.stdout.flush()
+            
+            # Abrir el workbook
+            wb = excel.Workbooks.Open(archivo_path)
+            print("✅ Workbook abierto")
+            sys.stdout.flush()
+            
+            # Obtener las hojas
+            ws_digitacion = wb.Worksheets("Digitación")
+            ws_tg = wb.Worksheets("T+G")
+            print("✅ Hojas obtenidas (Digitación y T+G)")
+            sys.stdout.flush()
+            
+            # Obtener el objeto de la tabla "TB" en Digitación
+            tabla_tb = None
+            print(f"🔍 Buscando tabla TB... (Total tablas: {ws_digitacion.ListObjects.Count})")
+            sys.stdout.flush()
+            for tbl in ws_digitacion.ListObjects:
+                print(f"   - Tabla encontrada: {tbl.Name}")
+                sys.stdout.flush()
+                if tbl.Name == "TB":
+                    tabla_tb = tbl
+                    print("✅ ¡Tabla TB encontrada!")
+                    sys.stdout.flush()
+                    break
+            
+            if not tabla_tb:
+                print("❌ ERROR: No se encontró la tabla TB")
+                sys.stdout.flush()
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                return
+            
+            # ENFOQUE CORRECTO: Conectar slicers directamente a la tabla TB
+            # Los slicers de tabla (no de tabla dinámica) filtran la tabla y todo lo conectado a ella
+            print("\n📊 Preparando slicers para tabla TB...")
+            sys.stdout.flush()
+            
+            # Crear slicers conectados directamente a la tabla TB
+            slicers_agregados = []
+            print(f"\n🎨 Creando {len(columnas_filtros_dinamicos)} slicer(s) conectados a tabla TB...")
+            sys.stdout.flush()
+            
+            for idx, col_filtro in enumerate(columnas_filtros_dinamicos):
+                print(f"\n   [{idx+1}/{len(columnas_filtros_dinamicos)}] Procesando: {col_filtro}")
+                sys.stdout.flush()
+                if col_filtro in data.columns.tolist():
+                    try:
+                        # Crear slicer conectado directamente a la tabla TB
+                        # Esto hace que el slicer filtre la tabla, y por ende los cálculos en T+G
+                        slicer_cache = wb.SlicerCaches.Add(
+                            Source=tabla_tb,
+                            SourceField=col_filtro
+                        )
+                        
+                        slicer = slicer_cache.Slicers.Add(
+                            SlicerDestination=ws_tg
+                        )
+                        
+                        # Posicionar el slicer
+                        slicer.Top = 50 + (idx * 220)
+                        slicer.Left = 50
+                        slicer.Height = 200
+                        slicer.Width = 250
+                        
+                        slicers_agregados.append(col_filtro)
+                        print(f"   ✅ Slicer creado y conectado a tabla TB")
+                        sys.stdout.flush()
+                    except Exception as e:
+                        print(f"   ❌ Error: {e}")
+                        sys.stdout.flush()
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"   ⚠️ Columna '{col_filtro}' no encontrada en el DataFrame")
+                    sys.stdout.flush()
+            
+            # Guardar y cerrar
+            print(f"\n💾 Guardando archivo...")
+            sys.stdout.flush()
+            wb.Save()
+            wb.Close(SaveChanges=True)
+            excel.Quit()
+            
+            # Limpiar COM
+            pythoncom.CoUninitialize()
+            print("✅ COM finalizado correctamente")
+            sys.stdout.flush()
+            
+            print(f"\n{'='*60}")
+            print(f"✅ PROCESO COMPLETADO")
+            print(f"   Slicers agregados: {', '.join(slicers_agregados) if slicers_agregados else 'ninguno'}")
+            print(f"{'='*60}\n")
+            sys.stdout.flush()
+            
+        except ImportError as ie:
+            print(f"❌ pywin32 no está instalado: {ie}")
+            sys.stdout.flush()
+            try:
+                pythoncom.CoUninitialize()
+            except:
+                pass
+        except Exception as e:
+            print(f"❌ Error al agregar slicers: {e}")
+            sys.stdout.flush()
+            import traceback
+            traceback.print_exc()
+            sys.stdout.flush()
+            try:
+                pythoncom.CoUninitialize()
+            except:
+                pass
+    else:
+        print("ℹ️ No hay columnas de filtro seleccionadas, saltando creación de slicers")
+        sys.stdout.flush()
+
     workbook.close()
