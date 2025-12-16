@@ -27,11 +27,25 @@
    - seaborn, st-aggrid, textwrap3
 
 4. **Ejecutar la aplicación:**
+   
+   Prueba estos comandos en orden hasta que funcione:
+   
+   **Opción 1 (más común en Windows):**
+   ```bash
+   py -m streamlit run Cargue.py
+   ```
+   
+   **Opción 2:**
    ```bash
    python -m streamlit run Cargue.py
    ```
    
-   **Nota:** Si `streamlit run Cargue.py` no funciona directamente, usar `python -m streamlit run Cargue.py`
+   **Opción 3:**
+   ```bash
+   streamlit run Cargue.py
+   ```
+   
+   **Nota:** Depende de cómo esté configurado Python en tu sistema. Usa el que funcione.
 
 5. **Acceder a la app:**
    - Se abrirá automáticamente en tu navegador
