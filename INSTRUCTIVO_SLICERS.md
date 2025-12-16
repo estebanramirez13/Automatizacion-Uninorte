@@ -1,5 +1,49 @@
 # 📘 Instructivo: Sistema de Slicers Dinámicos en Reportes Excel
 
+## 📋 Instalación en otro equipo
+
+### **Requisitos previos:**
+- ✅ Python 3.8 o superior instalado
+- ✅ Windows (para funcionalidad completa de slicers)
+- ✅ Microsoft Excel instalado (2010 o superior)
+
+### **Pasos de instalación:**
+
+1. **Copiar la carpeta completa** del proyecto a la nueva ubicación
+
+2. **Abrir terminal/PowerShell** en la carpeta del proyecto:
+   ```bash
+   cd ruta\a\Automatizacion
+   ```
+
+3. **Instalar dependencias:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   
+   Esto instalará todas las librerías necesarias:
+   - streamlit, pandas, xlsxwriter, openpyxl
+   - pywin32 (para slicers), numpy, matplotlib
+   - seaborn, st-aggrid, textwrap3
+
+4. **Ejecutar la aplicación:**
+   ```bash
+   python -m streamlit run Cargue.py
+   ```
+   
+   **Nota:** Si `streamlit run Cargue.py` no funciona directamente, usar `python -m streamlit run Cargue.py`
+
+5. **Acceder a la app:**
+   - Se abrirá automáticamente en tu navegador
+   - URL: `http://localhost:8501`
+
+### **Verificación:**
+- ✅ Si ves la interfaz con "Exportador de Excel", la instalación fue exitosa
+- ✅ Puedes cargar archivos y generar reportes
+- ✅ Si estás en Windows con Excel, los slicers funcionarán
+
+---
+
 ## 🎯 ¿Qué son los Slicers Dinámicos?
 
 Los **slicers** (o segmentadores de datos) son botones de filtro interactivos en Excel que permiten:
