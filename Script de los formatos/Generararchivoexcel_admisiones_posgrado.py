@@ -86,7 +86,8 @@
         
         # Ocultar la columna _VISIBLE
         Dijitacion.set_column(visible_col_idx, visible_col_idx, None, None, {'hidden': True})
-for col_num, col_name in enumerate(data.columns):
+    
+    for col_num, col_name in enumerate(data.columns):
         # Medir el ancho del header
         max_width = len(col_name)
 
