@@ -296,15 +296,15 @@
     
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(6, col, f'={countif_visible({general},"No Aplica")}/{denominador}', formato_borde_personalizado)
+            TG.write_formula(6, col, f'={countif_visible(general,"No Aplica")}/{denominador}', formato_borde_personalizado)
         else:
-            TG.write_formula(6, col,f'={countif_visible({general},{respuestas[col-17]})}/({denominador}-{countif_visible({general},"No Aplica")})', formato_borde_personalizado)
+            TG.write_formula(6, col,f'={countif_visible(general,respuestas[col-17])}/({denominador}-{countif_visible(general,"No Aplica")})', formato_borde_personalizado)
 
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(7, col, f'={countif_visible({general},"No Aplica")}', formato_borde_personalizado1)
+            TG.write_formula(7, col, f'={countif_visible(general,"No Aplica")}', formato_borde_personalizado1)
         else:
-            TG.write_formula(7, col,f'={countif_visible({general},{respuestas[col-17]})}', formato_borde_personalizado1)
+            TG.write_formula(7, col,f'={countif_visible(general,respuestas[col-17])}', formato_borde_personalizado1)
 
     #Grafica geeneral
     # Crea un gráfico de tipo columna en el bloque de la izquierda
