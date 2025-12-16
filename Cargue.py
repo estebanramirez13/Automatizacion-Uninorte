@@ -236,6 +236,20 @@ proceso_seleccionado = st.selectbox(
     index=procesos_disponibles.index(valor_guardado)
 )
 st.session_state["proceso_seleccionado"] = proceso_seleccionado
+
+# Campo adicional para nombre de oficina personalizado (solo para Oficina Genérica)
+if oficina_seleccionada == "Oficina Genérica / Personalizada":
+    nombre_oficina_personalizado = st.text_input(
+        "🏷️ Nombre de la oficina para el informe",
+        value=st.session_state.get("nombre_oficina_personalizado", ""),
+        placeholder="Ej: Oficina de Relaciones Internacionales",
+        help="Este nombre aparecerá en el informe Excel generado"
+    )
+    st.session_state["nombre_oficina_personalizado"] = nombre_oficina_personalizado
+else:
+    # Para otras oficinas, usar el nombre de la oficina seleccionada
+    st.session_state["nombre_oficina_personalizado"] = oficina_seleccionada
+
 nombre_archivo = st.text_input("📝 Nombre del archivo de salida (sin extensión)", value="exportado")
 numerodepoblacion = st.number_input("👥 Número de población", min_value=1, step=1)
 
@@ -337,9 +351,12 @@ if st.button("🚀 Ejecutar función excel_exportar"):
             preguntas = st.session_state.get("columnas_seleccionadas", [])
             comentarios = st.session_state.get("columnas_observaciones", [])
             general = st.session_state.get("nombre_columna_general", "")
-            oficina = oficina_seleccionada
+            
+            # Usar nombre personalizado si está disponible, sino usar oficina_seleccionada
+            oficina = st.session_state.get("nombre_oficina_personalizado", oficina_seleccionada)
+            
             proceso = proceso_seleccionado
-            script_name = diccionario_oficinas[oficina]["script"]
+            script_name = diccionario_oficinas[oficina_seleccionada]["script"]
             ruta_script = f"Script de los formatos/{script_name}.py"
 
             if not os.path.isfile(ruta_script):
@@ -352,7 +369,7 @@ if st.button("🚀 Ejecutar función excel_exportar"):
                 if hasattr(modulo, "excel_exportar"):
                     ruta_salida = f"{nombre_archivo}.xlsx"
                     # Si es Operaciones Tic, poner 'N_Caso' (o la columna que corresponda) de primera
-                    if oficina == "Operaciones Tic":
+                    if oficina_seleccionada == "Operaciones Tic":
                         col_primera = None
                         for col in df.columns:
                             if col.strip().lower() == "n_caso" or col.strip().lower() == "n caso":
