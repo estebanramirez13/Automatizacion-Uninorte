@@ -101,8 +101,7 @@ for col_num, col_name in enumerate(data.columns):
     header_format = workbook.add_format({
         'bold': True,        # Negrita
         'align': 'center',   # Centrar horizontalmente
-        'valign': 'vcenter', # Centrar verticalmente
-    
+        'valign': 'vcenter'  # Centrar verticalmente
     })
 
     #formato de celda
