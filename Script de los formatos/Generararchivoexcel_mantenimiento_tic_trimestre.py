@@ -294,15 +294,15 @@ for col_num, col_name in enumerate(data.columns):
         if col==22:
             # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
             denominador = '$G$11' if tiene_filtros else str(n_estimado)
-            TG.write_formula(6, col, f'={countif_visible({general},"No Aplica")}/{denominador}', formato_borde_personalizado)
+            TG.write_formula(6, col, f'={countif_visible(general,"No Aplica")}/{denominador}', formato_borde_personalizado)
         else:
-            TG.write_formula(6, col,f'={countif_visible({general},{respuestas[col-17]})}/({denominador}-{countif_visible({general},"No Aplica")})', formato_borde_personalizado)
+            TG.write_formula(6, col,f'={countif_visible(general,respuestas[col-17])}/({denominador}-{countif_visible(general,"No Aplica")})', formato_borde_personalizado)
 
     for col in range(17, 23):
         if col==22:
-            TG.write_formula(7, col, f'={countif_visible({general},"No Aplica")}', formato_borde_personalizado1)
+            TG.write_formula(7, col, f'={countif_visible(general,"No Aplica")}', formato_borde_personalizado1)
         else:
-            TG.write_formula(7, col,f'={countif_visible({general},{respuestas[col-17]})}', formato_borde_personalizado1)
+            TG.write_formula(7, col,f'={countif_visible(general,respuestas[col-17])}', formato_borde_personalizado1)
 
     #Grafica geeneral
     # Crea un gráfico de tipo columna en el bloque de la izquierda
