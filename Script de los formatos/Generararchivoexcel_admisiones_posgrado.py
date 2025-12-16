@@ -290,10 +290,12 @@
         TG.set_column(14,14, ancho_aproximado)
         TG.set_column(20,20, ancho_aproximado)
         # Aplicar bordes a la fila siguiente en el mismo rango de columnas
+    
+    # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
+    denominador = '$G$11' if tiene_filtros else str(n_estimado)
+    
     for col in range(17, 23):
         if col==22:
-            # Denominador dinámico: usar G11 (Muestra alcanzada) si hay filtros
-            denominador = '$G$11' if tiene_filtros else str(n_estimado)
             TG.write_formula(6, col, f'={countif_visible({general},"No Aplica")}/{denominador}', formato_borde_personalizado)
         else:
             TG.write_formula(6, col,f'={countif_visible({general},{respuestas[col-17]})}/({denominador}-{countif_visible({general},"No Aplica")})', formato_borde_personalizado)
