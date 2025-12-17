@@ -596,8 +596,8 @@ def excel_exportar(data, nombre_archivo,numerodepoblacion, Preguntas,columnas_ob
             TG.merge_range(row, 6, row, 7, calcular_poblacion_estimada(n_poblacion), workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         elif row==8:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
-            # Población: número ingresado por el usuario menos la suma de "No Aplica" (R8:V8)
-            TG.merge_range(row, 6, row, 7, f'={n_poblacion}-SUM(R8:V8)', workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
+            # Población: número ingresado por el usuario (población objetivo total)
+            TG.merge_range(row, 6, row, 7, n_poblacion, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black', 'num_format': '0'}))
         else:
             TG.merge_range(row, 4, row, 5, titulos_fichas[row-8], workbook.add_format({'align': 'center','left':2,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))
             TG.merge_range(row, 6, row, 7, None, workbook.add_format({'align': 'center','right':2,'left':1,'bottom':1,'bg_color': '#FFFFFF','border_color': 'black'}))

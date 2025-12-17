@@ -51,6 +51,79 @@ def pivotear_excel(df):
     else:
         return df
 
+def procesar_qualtrics(df):
+    # Procesamiento tipo Procesar_qualtrix.ipynb: limpieza de archivos exportados de Qualtrics
+    # Usar la fila 0 como encabezado (común en exports de Qualtrics)
+    df.columns = df.iloc[0]
+    # Eliminar AMBAS filas de encabezado: 
+    # - Fila 0: códigos técnicos (ya usada como encabezado)
+    # - Fila 1: descripciones en español (no son datos reales)
+    df = df[2:].reset_index(drop=True)
+    
+    # Manejar columnas duplicadas agregando sufijos
+    cols = pd.Series(df.columns)
+    for dup in cols[cols.duplicated()].unique():
+        cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range(sum(cols == dup))]
+    df.columns = cols
+    
+    # Primero: limpiar espacios y saltos de línea de todas las celdas string
+    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    
+    # Diccionario de reemplazos exhaustivo para Qualtrics
+    reemplazos_qualtrics = {
+        # Formatos con saltos de línea al inicio/final
+        '5- Totalmente satisfecho': 5,
+        '4- Satisfecho': 4,
+        '3- Neutral': 3,
+        '2- Insatisfecho': 2,
+        '1-Totalmente insatisfecho': 1,
+        # Variantes con "Estás"
+        '5- Estás totalmente Satisfecho': 5,
+        '5- Estás totalmente satisfecho': 5,
+        '4- Estás satisfecho': 4,
+        '3- Estás neutral': 3,
+        '2- Estás insatisfecho': 2,
+        '1- Estás totalmente insatisfecho': 1,
+        '1-Estás totalmente insatisfecho': 1,
+        # Formatos con "Muy"
+        '5 - Muy satisfecho': 5,
+        '4 - Satisfecho': 4,
+        '3 - Neutral': 3,
+        '2 - Insatisfecho': 2,
+        '1 - Muy insatisfecho': 1,
+        # Formatos de expectativas
+        'Supera notablemente las expectativas': 5,
+        '5. Supera notablemente las expectativas': 5,
+        '5 (Supera las expectativas)': 5,
+        'Cumple las expectativas': 3,
+        'Por debajo de las expectativas': 2,
+        'Muy por debajo de las expectativas': 1,
+        # Ya vienen como números pero como string
+        '5': 5,
+        '4': 4,
+        '3': 3,
+        '2': 2,
+        '1': 1,
+        # Contribución (escala diferente)
+        'Mucho': 4,
+        'Algo': 3,
+        'Poco': 2,
+        'Nada': 1
+    }
+    
+    # Aplicar reemplazos y convertir tipos explícitamente
+    df = df.replace(reemplazos_qualtrics).infer_objects(copy=False)
+    
+    # Convertir formato de fecha de Qualtrics si existe columna 'Fecha registrada'
+    if 'Fecha registrada' in df.columns:
+        try:
+            df['Fecha registrada'] = df['Fecha registrada'].astype(str)
+            df['Fecha registrada'] = pd.to_datetime(df['Fecha registrada'], format='mixed', errors='coerce').dt.strftime('%d/%m/%Y')
+        except:
+            pass  # Si falla, mantener valores originales
+    
+    return df
+
 # Diccionario de oficinas vinculado a un único script común y procesos asociados
 diccionario_oficinas = {
     "Dirección de Tecnología Informática y Comunicaciones": {
@@ -191,7 +264,7 @@ st.markdown('<div class="main-title">📤 Exportador Automático de Datos a Exce
 
 # --- Selector de método de procesamiento ---
 st.markdown('<div class="section-title">0️⃣ Selecciona el método de procesamiento</div>', unsafe_allow_html=True)
-metodo = st.radio("¿Cómo deseas procesar el archivo?", ["Procesar", "Pivotear"], horizontal=True)
+metodo = st.radio("¿Cómo deseas procesar el archivo?", ["Procesar", "Pivotear", "Qualtrics"], horizontal=True)
 
 # --- Sección: Carga del archivo ---
 st.markdown('<div class="section-title">1️⃣ Subir archivo Excel</div>', unsafe_allow_html=True)
@@ -211,6 +284,9 @@ if archivo_excel is not None:
         elif metodo == "Pivotear":
             df = pivotear_excel(df)
             st.success("✅ Archivo procesado correctamente (Pivotear)")
+        elif metodo == "Qualtrics":
+            df = procesar_qualtrics(df)
+            st.success("✅ Archivo procesado correctamente (Qualtrics)")
         st.session_state["df_encuesta"] = df
     except Exception as e:
         st.error(f"❌ Error al leer o procesar el archivo: {e}")
@@ -258,8 +334,13 @@ periodo_unico  = st.text_input("📝 Escribir periodo en que se relizo la encues
 
 # --- Vista previa del archivo cargado ---
 if archivo_excel is not None:
-    df = pd.read_excel(archivo_excel)
-    st.success("✅ Archivo cargado exitosamente")
+    # Usar el dataframe ya procesado del session_state
+    df = st.session_state.get("df_encuesta", pd.DataFrame())
+    
+    if df.empty:
+        st.error("❌ Error: No se pudo procesar el archivo")
+    else:
+        st.success("✅ Archivo cargado exitosamente")
     
     # Inicializar variables que se usan en este bloque
     columnas_pregunta_detectadas = []
@@ -291,9 +372,11 @@ if archivo_excel is not None:
         contiene_valores = valores.issubset(posibles_valores) or len(valores.intersection(posibles_valores)) >= 3
         es_general = "general" in col.lower()
         es_numero = "numero" in col.lower()
-        if contiene_valores and not es_general and not es_numero and not df[col].isna().all():
+        # Excluir columnas que terminan en _1, _2, etc. (duplicadas de Qualtrics)
+        es_duplicada = col.endswith('_1') or col.endswith('_2') or col.endswith('_3') or col.endswith('_4')
+        if contiene_valores and not es_general and not es_numero and not es_duplicada and not df[col].isna().all():
             columnas_pregunta_detectadas.append(col)
-        elif "general" in col.lower():
+        elif "general" in col.lower() and not es_duplicada:
             nombre_columna_general = col
     columnas_pregunta_detectadas=[x for x in columnas_pregunta_detectadas if x not in columnas_todo_no_aplica]
     st.markdown('<div class="section-title">🧮 Columnas detectadas como preguntas</div>', unsafe_allow_html=True)
@@ -310,7 +393,10 @@ if archivo_excel is not None:
     columnas_observaciones = st.multiselect("✏️ Selecciona columnas de observación", options=df.columns.tolist(), default=columnas_observaciones_detectadas)
 
     #st.markdown(f"**📌 Columna general detectada:** `{nombre_columna_general}`")
-    nombre_columna_general=st.multiselect("📌 Selecciona la columna general (opcional)",options=df.columns.tolist(),default=nombre_columna_general)[0]
+    # Validar que el default exista en las columnas
+    default_general = [nombre_columna_general] if nombre_columna_general and nombre_columna_general in df.columns else []
+    columna_general_seleccion = st.multiselect("📌 Selecciona la columna general (opcional)", options=df.columns.tolist(), default=default_general)
+    nombre_columna_general = columna_general_seleccion[0] if columna_general_seleccion else ""
         
    # Guardar en session_state para que otras páginas puedan acceder
     st.session_state["oficina_seleccionada"]=oficina_seleccionada
